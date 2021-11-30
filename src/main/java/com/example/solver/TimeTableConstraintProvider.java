@@ -16,17 +16,29 @@ public class TimeTableConstraintProvider implements ConstraintProvider {
     public Constraint[] defineConstraints(ConstraintFactory constraintFactory) {
         return new Constraint[] {
                 //allowAllWO(constraintFactory),
+                //penalizeTooMuchTimeslot(constraintFactory), //HARD
                 penalizeUnderAssignation(constraintFactory),
                 penalizeNullWorkOrder(constraintFactory),
                 limitWONumberOnTimeSlot(constraintFactory), // HARD
                 limitOverAssignation(constraintFactory),
                 penalizeSameOnTimeSlotSameWO(constraintFactory), //HARD
                 penaliseGapBetweenWO(constraintFactory),
-               // minimizeDistance(constraintFactory),
+                //minimizeDistance(constraintFactory),
                 /*limitAWOPDurationOnTimeSlot(constraintFactory),
                 minimizeDistance(constraintFactory)*/
         };
     }
+
+    private Constraint penalizeTooMuchTimeslot(ConstraintFactory constraintFactory) {
+        return constraintFactory.fromUnfiltered(AtomicWorkOrderPart.class)
+                .filter(atomicWorkOrderPart -> atomicWorkOrderPart.getWorkOrder() != null)
+                .groupBy(AtomicWorkOrderPart::getTimeslot,
+                        ConstraintCollectors.count())
+                .filter((ts, nbTS) -> ts.getAllowedWO() < nbTS)
+                .penalize("Penalize too much TS",
+                        HardMediumSoftScore.ONE_HARD);
+    }
+
     private Constraint penalizeSameOnTimeSlotSameWO(ConstraintFactory constraintFactory) {
         return constraintFactory.fromUnfiltered(AtomicWorkOrderPart.class)
                 .filter(atomicWorkOrderPart -> atomicWorkOrderPart.getWorkOrder() != null)
@@ -43,7 +55,7 @@ public class TimeTableConstraintProvider implements ConstraintProvider {
                 .groupBy(AtomicWorkOrderPart::getWorkOrder,
                         ConstraintCollectors.count(),
                         ConstraintCollectors.sum(awop -> Math.toIntExact(awop.getTimeslot().getId())),
-                        ConstraintCollectors.toList(awop -> Math.toIntExact(awop.getTimeslot().getId()))
+                        ConstraintCollectors.min(awop -> awop.getTimeslot().getId()))
                 )
                 .filter((wo, nWO, sTSId, listTS) -> nWO > 1 &&
                         (sTSId - (nWO * (nWO - 1) / 2)) % nWO != 0 ||
@@ -105,7 +117,7 @@ public class TimeTableConstraintProvider implements ConstraintProvider {
 
     private Constraint limitWONumberOnTimeSlot(ConstraintFactory constraintFactory) {
         return constraintFactory.from(AtomicWorkOrderPart.class)
-                .filter(awo -> awo.getWorkOrder() != null)
+                //.filter(awo -> awo.getWorkOrder() != null)
                 .groupBy(AtomicWorkOrderPart::getTimeslot, ConstraintCollectors.count())
                 .filter((timeslot, integer) -> integer > timeslot.getAllowedWO())
                 .penalize("Too many WO on the same timeslot",
@@ -131,10 +143,13 @@ public class TimeTableConstraintProvider implements ConstraintProvider {
 */
     private Constraint minimizeDistance(ConstraintFactory constraintFactory) {
         return constraintFactory.from(AtomicWorkOrderPart.class)
-                .filter(awo -> awo.getWorkOrder() != null)
+                .filter(awop -> awop.getWorkOrder() != null)
+                .groupBy(AtomicWorkOrderPart::getWorkOrder,
+                        ConstraintCollectors.toList(awop -> awop.getTimeslot().getDate()))
                 .penalize("AWOP distance should be minimized",
-                        HardMediumSoftScore.ONE_HARD,
-                        (awo) -> Math.toIntExact(Math.abs(ChronoUnit.DAYS.between(awo.getWorkOrder().getEndDate(), awo.getTimeslot().getDate()))));
+                        HardMediumSoftScore.ONE_MEDIUM,
+                        (wo, listDate) -> Math.toIntExact(Math.abs(
+                                ChronoUnit.DAYS.between(wo.getEndDate(), listDate.get(listDate.size() - 1)))));
     }
 
 }

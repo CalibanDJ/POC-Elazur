@@ -29,7 +29,7 @@ public class AtomicWorkOrderPart {
     }
 
 
-    @PlanningVariable(valueRangeProviderRefs = "timeslotRange")
+    @PlanningVariable(valueRangeProviderRefs = "timeslotRange", strengthComparatorClass = )
     public Timeslot getTimeslot() {
         return timeslot;
     }
