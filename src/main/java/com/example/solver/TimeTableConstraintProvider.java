@@ -18,10 +18,10 @@ public class TimeTableConstraintProvider implements ConstraintProvider {
                 //allowAllWO(constraintFactory),
                 penalizeUnderAssignation(constraintFactory),
                 penalizeNullWorkOrder(constraintFactory),
-                limitWONumberOnTimeSlot(constraintFactory),
-                //limitOverAssignation(constraintFactory),
-                penalizeSameOnTimeSlotSameWO(constraintFactory),
-                penaliseGapBetweenSameWO(constraintFactory),
+                limitWONumberOnTimeSlot(constraintFactory), // HARD
+                limitOverAssignation(constraintFactory),
+                penalizeSameOnTimeSlotSameWO(constraintFactory), //HARD
+                penaliseGapBetweenWO(constraintFactory),
                // minimizeDistance(constraintFactory),
                 /*limitAWOPDurationOnTimeSlot(constraintFactory),
                 minimizeDistance(constraintFactory)*/
@@ -35,6 +35,29 @@ public class TimeTableConstraintProvider implements ConstraintProvider {
                 .filter((wo, inte1, inte2) -> inte2 > 1 && !inte1.equals(inte2))
                 .penalize("Penalize same WO on TS",
                         HardMediumSoftScore.ONE_HARD);
+    }
+
+    private Constraint penaliseGapBetweenWO(ConstraintFactory constraintFactory) {
+        return constraintFactory.fromUnfiltered(AtomicWorkOrderPart.class)
+                .filter(awop -> awop.getWorkOrder() != null)
+                .groupBy(AtomicWorkOrderPart::getWorkOrder,
+                        ConstraintCollectors.count(),
+                        ConstraintCollectors.sum(awop -> Math.toIntExact(awop.getTimeslot().getId())),
+                        ConstraintCollectors.toList(awop -> Math.toIntExact(awop.getTimeslot().getId()))
+                )
+                .filter((wo, nWO, sTSId, listTS) -> nWO > 1 &&
+                        (sTSId - (nWO * (nWO - 1) / 2)) % nWO != 0 ||
+                        (sTSId - (nWO * (nWO - 1) / 2)) / nWO != listTS.get(0))
+                .penalize("Penalize gap between WO",
+                        HardMediumSoftScore.ONE_HARD);
+
+                /*.filter(awop1 -> awop1.getWorkOrder() != null)
+                .join(AtomicWorkOrderPart.class)
+                .filter((awop1, awop2) -> awop2.getWorkOrder() != null)
+                .filter((awop1, awop2) -> awop1.getWorkOrder().getId().equals(awop2.getWorkOrder().getId()))
+                .penalize("Penalize gap between WO",
+                        HardMediumSoftScore.ONE_HARD,
+                        (awop1, awop2) -> Math.abs(Math.toIntExact(awop1.getTimeslot().getId() - awop2.getTimeslot().getId())));*/
     }
 
     private Constraint penaliseGapBetweenSameWO(ConstraintFactory constraintFactory) {
@@ -60,7 +83,7 @@ public class TimeTableConstraintProvider implements ConstraintProvider {
                 .groupBy(AtomicWorkOrderPart::getWorkOrder, ConstraintCollectors.sum(awo -> Math.toIntExact(awo.getTimeslot().getDuration())))
                 .filter((wo, inte) -> wo.getDuration() > inte)
                 .penalize("Penalize WorkOrder that are not assignated",
-                        HardMediumSoftScore.ONE_SOFT);
+                        HardMediumSoftScore.ONE_MEDIUM);
     }
 
     private Constraint limitOverAssignation(ConstraintFactory constraintFactory) {

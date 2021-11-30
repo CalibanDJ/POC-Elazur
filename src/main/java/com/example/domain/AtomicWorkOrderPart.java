@@ -28,6 +28,7 @@ public class AtomicWorkOrderPart {
         return id;
     }
 
+
     @PlanningVariable(valueRangeProviderRefs = "timeslotRange")
     public Timeslot getTimeslot() {
         return timeslot;

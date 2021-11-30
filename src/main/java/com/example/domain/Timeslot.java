@@ -1,6 +1,8 @@
 package com.example.domain;
 
 
+import org.optaplanner.core.api.domain.lookup.PlanningId;
+
 import java.time.LocalDate;
 
 public class Timeslot {
