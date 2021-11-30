@@ -1,6 +1,7 @@
 package com.example.domain;
 
 import org.optaplanner.core.api.domain.entity.PlanningEntity;
+import org.optaplanner.core.api.domain.lookup.PlanningId;
 import org.optaplanner.core.api.domain.variable.PlanningVariable;
 
 import java.time.LocalDate;
@@ -8,6 +9,7 @@ import java.time.LocalDate;
 @PlanningEntity
 public class AtomicWorkOrderPart {
 
+    @PlanningId
     private Long id;
 
     private Timeslot timeslot;
